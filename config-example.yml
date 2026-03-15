@@ -47,6 +47,18 @@ weather_lat: "45.516022" # latitude for for weather plugin
 weather_long: "-122.681427"
 max_weather_hours: 8 # how many hours ahead to send weather info for
 
+### MESH STATS PLUGIN
+meshstats:
+  enabled: true                         # Enable the $stats command plugin
+  command_name: "stats"                 # Triggered as $stats
+  report_title: "Flyover Mesh Status"   # First line of the reply
+  active_window_hours: 1                # Count nodes heard within this many hours as active
+  last_heard_count: 5                   # Number of recent nodes to list
+  exclude_host_node: true               # Exclude the local host-connected node from Last Heard
+  host_node_id: ""                      # Optional override for the host node ID when testing from CLI
+  testing_mode: false                   # No automatic behavior in v1; useful for terminal-only testing
+  debug_logging: false                  # Log query/filter details to the console
+
 ### SCHEDULED MESSAGES PLUGIN
 # The scheduled messages plugin sends automated messages at configured intervals
 # Configuration is in scheduled_messages.json (see scheduled_messages-example.json)
