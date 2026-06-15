@@ -63,10 +63,10 @@ class basicEvents(plugins.Base):
             # Only send to Discord if not from ignored channels
             if not is_ignored_channel:
                 title = f"From: {username}"
-                description = text
                 relay_display = DiscordUtil.formatRelayNode(interface, packet)
+                description = text
                 if relay_display:
-                    description += f"\n\nLast hop: {relay_display}"
+                    description = f"Last hop: {relay_display}\n\n{text}"
                 if cfg.config["ping_on_messages"]:
                     description += f"\n\n{cfg.config['message_role']}"
 

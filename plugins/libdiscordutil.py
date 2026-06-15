@@ -1,4 +1,7 @@
 import asyncio
+import os
+import sqlite3
+import cfg
 import plugins.libmesh as LibMesh
 import discord
 
@@ -35,6 +38,63 @@ def _get_node_num(node_key, node_info):
 
     return None
 
+def _get_relay_display_name(name_data):
+    if not name_data:
+        return None
+    return name_data.get("long_name") or name_data.get("short_name") or name_data.get("id")
+
+def _lookup_relay_in_tracking_db(relay_num, source_id):
+    node_tracking = cfg.config.get("node_tracking", {})
+    if not node_tracking.get("enabled", False):
+        return None
+
+    db_path = node_tracking.get("database_path", "./nodes.db")
+    if not db_path or not os.path.exists(db_path):
+        return None
+
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT node_id, node_num, long_name, short_name, last_seen_utc, total_packets_received
+            FROM nodes
+            WHERE node_id != ? AND node_num IS NOT NULL
+            """,
+            (source_id,)
+        )
+
+        matches = []
+        for row in cursor.fetchall():
+            node_num = _coerce_node_num(row["node_num"])
+            if node_num is None or (node_num & 0xFF) != (relay_num & 0xFF):
+                continue
+
+            matches.append({
+                "id": row["node_id"] or f"!{node_num:08x}",
+                "long_name": row["long_name"],
+                "short_name": row["short_name"],
+                "last_seen": row["last_seen_utc"] or "",
+                "packet_count": row["total_packets_received"] or 0,
+            })
+
+        if not matches:
+            return None
+
+        matches.sort(key=lambda node: (node["last_seen"], node["packet_count"]), reverse=True)
+        best_match = matches[0]
+        return {
+            "id": best_match["id"],
+            "name": _get_relay_display_name(best_match),
+        }
+    except sqlite3.Error:
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
 def resolveRelayNode(interface, packet):
     relay_node = packet.get("relayNode")
     if relay_node is None:
@@ -69,6 +129,10 @@ def resolveRelayNode(interface, packet):
         matches.sort(key=lambda node: (node["last_heard"], node["snr"]), reverse=True)
         return matches[0]
 
+    db_match = _lookup_relay_in_tracking_db(relay_num, source_id)
+    if db_match:
+        return db_match
+
     relay_id = f"!{relay_num:08x}" if relay_num > 0xFF else f"0x{relay_num & 0xFF:02x}"
     return {"id": relay_id, "name": relay_id}
 
@@ -79,8 +143,6 @@ def formatRelayNode(interface, packet):
 
     relay_name = relay.get("name")
     relay_id = relay.get("id")
-    if relay_name and relay_id and relay_name != relay_id:
-        return f"{relay_name} ({relay_id})"
     return relay_name or relay_id
 
 def genUserName(interface, packet, details=True):
