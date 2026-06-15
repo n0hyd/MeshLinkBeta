@@ -43,6 +43,13 @@ def _get_relay_display_name(name_data):
         return None
     return name_data.get("long_name") or name_data.get("short_name") or name_data.get("id")
 
+def _get_hops_away(packet):
+    hop_start = packet.get("hopStart")
+    hop_limit = packet.get("hopLimit")
+    if hop_start is None or hop_limit is None:
+        return None
+    return hop_start - hop_limit
+
 def _lookup_relay_in_tracking_db(relay_num, source_id):
     node_tracking = cfg.config.get("node_tracking", {})
     if not node_tracking.get("enabled", False):
@@ -96,6 +103,10 @@ def _lookup_relay_in_tracking_db(relay_num, source_id):
             conn.close()
 
 def resolveRelayNode(interface, packet):
+    hops_away = _get_hops_away(packet)
+    if hops_away is not None and hops_away <= 0:
+        return None
+
     relay_node = packet.get("relayNode")
     if relay_node is None:
         return None
